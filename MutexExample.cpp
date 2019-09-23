@@ -1,4 +1,4 @@
-#include <stdio.h>
+#include <iostream>
 #include <stdlib.h>
 #include <pthread.h>
 #include <time.h>
@@ -17,14 +17,14 @@ int main()
 	int t,m,div;
 	pthread_t *id;
 
-	printf("Configurar parametro t: ");
-	scanf("%d", &t);
+	cout << "Configurar parametro t: ";
+	cin >> t;
 	
-	printf("Configurar parametro m: ");
-	scanf("%d", &m);
+	cout << "Configurar parametro m: ";
+	cin >> m;
 
-	array = malloc(t * sizeof(int));
-	id = malloc(m * sizeof(pthread_t));
+	array = (int *) malloc(t * sizeof(int));
+	id = (pthread_t *) malloc(m * sizeof(pthread_t));
 	srand(time(NULL));
 
 	for(int i = 0; i < t; i++)
@@ -51,7 +51,7 @@ int main()
  		pthread_join(id[i], NULL);
  	}
 
- 	printf("Result: %d\n", buff);
+ 	cout << "Result: " << buff << endl;
  	free(array);
  	free(id);
  	pthread_mutex_destroy(&lock);
