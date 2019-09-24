@@ -1,107 +1,125 @@
 #include <iostream>
-#include <stdlib.h>
+#include <list>
 #include <pthread.h>
-#include <time.h>
 
 using namespace std;
 
-void *produtor_function(void * arg);
-void *consumidor_function(void * arg);
+void *produce(void * arg);
+void *consume(void * arg);
 
-int *buffer;
-int v, t, pos = 0;
+int t, v;
+pthread_t *producers;
+pthread_t *consumers;
 pthread_mutex_t lock;
-pthread_cond_t condC, condP;
+pthread_cond_t full_buffer;
+pthread_cond_t empty_buffer;
 
 int main()
-{
+{	
 	int p, c;
-	pthread_t *produtores, *consumidores;
+	list<int> *buffer;
+	list<int>::iterator item;
+
 	srand(time(NULL));
 	
-	cout << "Quantidade de produtores: ";
-	cin >> p;
-
-	cout << "Quantidade de consumidores: ";
-	cin >> c;
-
-	cout << "Quantidade de interações: ";
+	cout << "Interactions: ";
 	cin >> v;
 
-	cout << "Tamanho do buffer: ";
+	cout << "Producers: ";
+	cin >> p;
+
+	cout << "Consumers: ";
+	cin >> c;
+
+	cout << "Buffer size: ";
 	cin >> t;
 
-	buffer = (int *) malloc(t * sizeof(int));
-	produtores = (pthread_t *) malloc(p * sizeof(pthread_t));
-	consumidores = (pthread_t *) malloc(c * sizeof(pthread_t));
+	producers = (pthread_t *) malloc(p * sizeof(pthread_t));
+	consumers = (pthread_t *) malloc(c * sizeof(pthread_t));
 
 	pthread_mutex_init(&lock, NULL);
-	pthread_cond_init(&condC, NULL);
-	pthread_cond_init(&condP, NULL);
+	pthread_cond_init(&full_buffer, NULL);
+	pthread_cond_init(&empty_buffer, NULL);
 
 	//DISPARA THREADS PRODUTORES
 	for(int i = 0; i < p; i++)
 	{
-		pthread_create(&produtores[i], NULL, produtor_function, (void*)buffer);			
+		pthread_create(&producers[i], NULL, produce, (void*) buffer);			
 	}
 
 	//DISPARA THREADS CONSUMIDORES
 	for(int i = 0; i < c; i++)
 	{
-		pthread_create(&consumidores[i], NULL, consumidor_function, (void*)buffer);			
+		pthread_create(&consumers[i], NULL, consume, (void*) buffer);			
 	}
 
 
 	for(int i = 0; i < p; i++)
 	{
-		pthread_join(produtores[i], NULL);
+		pthread_join(producers[i], NULL);
 	}
+
+	for(int i = 0; i < c ; i++){
+        buffer->push_back(-1);
+        pthread_cond_signal(&full_buffer);
+    }
 
 	for(int i = 0; i < c; i++)
 	{
-		pthread_join(consumidores[i], NULL);
+		pthread_join(consumers[i], NULL);
 	}
 
 	return 0;
 }
 
-void *produtor_function(void * arg)
+void *produce(void * arg)
 {
+	list<int> *buffer = (list<int> *) arg;
 	
 	for(int i = 0; i < v; i++)
 	{
 		pthread_mutex_lock(&lock);
 		
-		buffer[pos] = rand();
-		cout << "Produzido: " << buffer[pos] << endl;
-		pos++;
-		pthread_cond_signal(&condC);
-
-		while(buffer[t - 1] != 0)
+		while(buffer->size() == t)
 		{
-			pthread_cond_wait(&condP, &lock);
+			pthread_cond_wait(&empty_buffer, &lock);
 		}
+
+		buffer->push_back(rand());
+
+		pthread_cond_signal(&full_buffer);
 
 		pthread_mutex_unlock(&lock);
 	}
+
+	return NULL;
 }
 
-void *consumidor_function(void * arg)
+void *consume(void * arg)
 {
-	while(buffer[0] != 0)
+	list<int> *buffer = (list<int> *) arg;
+	int value;
+
+	while(1)
 	{
 		pthread_mutex_lock(&lock);
 		
-		while(pos == 0)
+		while(buffer->size() == 0)
 		{
-			pthread_cond_wait(&condC, &lock);
+			pthread_cond_wait(&full_buffer, &lock);
 		}
 
-		pos--;
-		cout << "Consumido: " << buffer[pos] << endl;
-		buffer[pos] = 0;
-		pthread_cond_signal(&condP);
+		if(buffer->front() == -1)
+		{
+			buffer->pop_front();
+			pthread_mutex_unlock(&lock);
+			break;
+		}
+
+		pthread_cond_signal(&empty_buffer);
 		
 		pthread_mutex_unlock(&lock);
 	}
+
+	return NULL;
 }
